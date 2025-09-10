@@ -26,6 +26,8 @@ declare(strict_types=1);
 
 namespace local_stringreplacer;
 
+use stdClass;
+
 /**
  * String manager which can naively replace patterns within language strings.
  *
@@ -34,18 +36,34 @@ namespace local_stringreplacer;
  */
 class string_manager extends \core_string_manager_standard {
 
+    // Normally if we extend the core_string_manager_standard class, we WOULD
+    // have the additional params ($otherroot, $localroot, etc) which would be passed
+    // to the parent constructor.
+    //
+    // However, just to show that wildly different constructors are possible, I am
+    // only defining the $config parameter and I've forcibly set things like localroot,
+    // otherroot, etc to empty values.
+    public function __construct(private stdClass $config) {
+        parent::__construct('', '', [], []);
+    }
+
     public function get_string($identifier, $component = '', $a = null, $lang = null) {
-        $config = get_config('local_stringreplacer');
         $string = parent::get_string($identifier, $component, $a, $lang);
 
-        if (in_array($component, explode(',', $config->excludecomponents))) {
+        if (in_array($component, explode(',', $this->config->excludecomponents))) {
             return $string;
         }
 
-        $wholeword = $config->wholewordonly ? "\b" : '';
+        // Note we access the config via $this->config as it has been injected through
+        // the constructor. In the "legacy" version of the plugin, we have to do a
+        // `get_config` call directly in this method to get the config.
+        //
+        // Having it injected in by the container makes the class way less coupled and
+        // allows easier testing.
+        $wholeword = $this->config->wholewordonly ? "\b" : '';
         $patterns = array_map(
             fn(string $l): array => array_map('trim', explode("|", $l)),
-            explode("\n", $config->patterns)
+            explode("\n", $this->config->patterns)
         );
 
         return preg_replace(
